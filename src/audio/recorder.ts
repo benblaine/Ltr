@@ -11,13 +11,8 @@ export interface RecorderDiagnosticEntry {
 
 export class AudioRecorder {
   private mediaRecorder: MediaRecorder | null = null;
-  private audioContext: AudioContext | null = null;
-  private analyser: AnalyserNode | null = null;
   private stream: MediaStream | null = null;
-
-  private silenceThreshold = 0.01;
-  private silenceMs = 800;
-  private maxDurationMs = 5000;
+  private maxTimeout: ReturnType<typeof setTimeout> | null = null;
 
   private _log: RecorderDiagnosticEntry[] = [];
 
@@ -68,63 +63,46 @@ export class AudioRecorder {
         if (e.data.size > 0) chunks.push(e.data);
       };
       this.mediaRecorder.onstop = () => {
+        if (this.maxTimeout) {
+          clearTimeout(this.maxTimeout);
+          this.maxTimeout = null;
+        }
+        const duration = Date.now() - startTime;
+        this.log('stopped', `duration=${duration}ms chunks=${chunks.length}`);
         resolve({
           blob: new Blob(chunks, { type: mimeType }),
-          durationMs: Date.now() - startTime,
+          durationMs: duration,
         });
       };
-      this.mediaRecorder.onerror = () => reject(new Error('Recording failed'));
-
-      this.audioContext = new AudioContext();
-      const source = this.audioContext.createMediaStreamSource(this.stream!);
-      this.analyser = this.audioContext.createAnalyser();
-      this.analyser.fftSize = 256;
-      source.connect(this.analyser);
+      this.mediaRecorder.onerror = () => {
+        this.log('error');
+        reject(new Error('Recording failed'));
+      };
 
       this.mediaRecorder.start(100);
-      this.monitorSilence();
-      setTimeout(() => this.stop(), this.maxDurationMs);
+      this.log('recording');
+
+      // Safety max — 10 seconds to prevent runaway recording
+      this.maxTimeout = setTimeout(() => {
+        this.log('max-timeout', '10s');
+        this.stop();
+      }, 10000);
     });
   }
 
-  private monitorSilence() {
-    const dataArray = new Uint8Array(this.analyser!.frequencyBinCount);
-    let silenceStart: number | null = null;
-
-    const check = () => {
-      if (!this.mediaRecorder || this.mediaRecorder.state !== 'recording') return;
-      this.analyser!.getByteTimeDomainData(dataArray);
-      let sum = 0;
-      for (let i = 0; i < dataArray.length; i++) {
-        const n = (dataArray[i] - 128) / 128;
-        sum += n * n;
-      }
-      const rms = Math.sqrt(sum / dataArray.length);
-
-      if (rms < this.silenceThreshold) {
-        if (!silenceStart) silenceStart = Date.now();
-        if (Date.now() - silenceStart > this.silenceMs) {
-          this.stop();
-          return;
-        }
-      } else {
-        silenceStart = null;
-      }
-      requestAnimationFrame(check);
-    };
-    setTimeout(() => requestAnimationFrame(check), 300);
-  }
-
   stop() {
-    if (this.mediaRecorder?.state === 'recording') this.mediaRecorder.stop();
-    if (this.audioContext) {
-      this.audioContext.close();
-      this.audioContext = null;
+    this.log('stop', `state=${this.mediaRecorder?.state ?? 'none'}`);
+    if (this.mediaRecorder?.state === 'recording') {
+      this.mediaRecorder.stop();
     }
   }
 
   cleanup() {
     this.stop();
+    if (this.maxTimeout) {
+      clearTimeout(this.maxTimeout);
+      this.maxTimeout = null;
+    }
     if (this.stream) {
       this.stream.getTracks().forEach((t) => t.stop());
       this.stream = null;

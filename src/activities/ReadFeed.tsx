@@ -73,63 +73,59 @@ export function ReadFeed() {
     }
   }, [slideDirection]);
 
-  const handleTap = useCallback(async () => {
-    if (phase === 'ready') {
-      // Start recording
-      const recorder = recorderRef.current;
-      const evaluator = evaluatorRef.current;
-      if (!recorder) return;
+  const handleStartRecording = useCallback(async () => {
+    if (phase !== 'ready') return;
+    const recorder = recorderRef.current;
+    const evaluator = evaluatorRef.current;
+    if (!recorder) return;
 
-      setPhase('recording');
+    setPhase('recording');
 
-      try {
-        const currentWord = words[currentIndex];
-        const recordingPromise = recorder.start();
-        const asrPromise = evaluator?.canDoASR
-          ? evaluator.evaluate(currentWord.text)
-          : Promise.resolve(null);
+    try {
+      const currentWord = words[currentIndex];
+      const recordingPromise = recorder.start();
+      const asrPromise = evaluator?.canDoASR
+        ? evaluator.evaluate(currentWord.text)
+        : Promise.resolve(null);
 
-        const [_recording, asrResult] = await Promise.all([recordingPromise, asrPromise]);
+      const [_recording, asrResult] = await Promise.all([recordingPromise, asrPromise]);
 
-        if (asrResult) {
-          // Always show what we heard
-          setTranscript(asrResult.transcript ?? '');
+      if (asrResult) {
+        setTranscript(asrResult.transcript ?? '');
 
-          if (asrResult.mode === 'asr') {
-            // High confidence — auto-judge
-            setIsCorrect(asrResult.isCorrect);
-            setPhase('result');
+        if (asrResult.mode === 'asr') {
+          setIsCorrect(asrResult.isCorrect);
+          setPhase('result');
 
-            if (session) {
-              const duration = Date.now() - startTimeRef.current;
-              const updated = await recordAttempt(
-                session,
-                currentWord.id,
-                asrResult.isCorrect ? 'correct' : 'incorrect',
-                asrResult.confidence,
-                duration,
-              );
-              setSession(updated);
-            }
-          } else {
-            // Low confidence — show transcript but ask user to confirm
-            setPhase('self-eval');
+          if (session) {
+            const duration = Date.now() - startTimeRef.current;
+            const updated = await recordAttempt(
+              session,
+              currentWord.id,
+              asrResult.isCorrect ? 'correct' : 'incorrect',
+              asrResult.confidence,
+              duration,
+            );
+            setSession(updated);
           }
         } else {
-          // No ASR at all — plain self eval
-          setTranscript('');
           setPhase('self-eval');
         }
-      } catch {
+      } else {
         setTranscript('');
         setPhase('self-eval');
       }
-    } else if (phase === 'recording') {
-      // Stop recording and ASR so promises resolve immediately
-      recorderRef.current?.stop();
-      evaluatorRef.current?.stop();
+    } catch {
+      setTranscript('');
+      setPhase('self-eval');
     }
   }, [phase, words, currentIndex, session]);
+
+  const handleStopRecording = useCallback(() => {
+    if (phase !== 'recording') return;
+    recorderRef.current?.stop();
+    evaluatorRef.current?.stop();
+  }, [phase]);
 
   const handleSelfEval = useCallback(async (correct: boolean) => {
     setIsCorrect(correct);
@@ -294,7 +290,6 @@ export function ReadFeed() {
         className={`flex-1 flex flex-col items-center justify-center px-6 gap-6 transition-all duration-200 ${
           slideDirection === 'out' ? '-translate-y-full opacity-0' : ''
         } ${slideDirection === 'in' ? 'animate-[slide-up_0.3s_ease-out]' : ''}`}
-        onClick={phase === 'ready' || phase === 'recording' ? handleTap : undefined}
       >
         {/* Emoji */}
         {word.imageEmoji && (
@@ -315,8 +310,10 @@ export function ReadFeed() {
         {/* Phase-specific UI */}
         {phase === 'ready' && (
           <div className="flex flex-col items-center gap-4 mt-4">
-            <div
-              className="w-20 h-20 rounded-full flex items-center justify-center bg-[var(--interactive)] shadow-[var(--shadow-md)] cursor-pointer transition-transform active:scale-90"
+            <button
+              type="button"
+              onClick={handleStartRecording}
+              className="w-20 h-20 rounded-full flex items-center justify-center bg-[var(--interactive)] shadow-[var(--shadow-md)] cursor-pointer transition-transform active:scale-90 border-none"
             >
               <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
                 <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
@@ -324,7 +321,7 @@ export function ReadFeed() {
                 <line x1="12" y1="19" x2="12" y2="23" />
                 <line x1="8" y1="23" x2="16" y2="23" />
               </svg>
-            </div>
+            </button>
             <p className="text-[var(--text-ui)] text-[var(--text-secondary)] m-0" style={{ fontFamily: 'var(--font-ui)' }}>
               Tap to say the word
             </p>
@@ -333,16 +330,15 @@ export function ReadFeed() {
 
         {phase === 'recording' && (
           <div className="flex flex-col items-center gap-4 mt-4">
-            <div
-              className="w-20 h-20 rounded-full flex items-center justify-center bg-[var(--danger)] shadow-[var(--shadow-md)] animate-pulse cursor-pointer"
+            <button
+              type="button"
+              onClick={handleStopRecording}
+              className="w-20 h-20 rounded-full flex items-center justify-center bg-[var(--danger)] shadow-[var(--shadow-md)] animate-pulse cursor-pointer border-none"
             >
-              <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
-                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
-                <line x1="12" y1="19" x2="12" y2="23" />
-                <line x1="8" y1="23" x2="16" y2="23" />
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="white" stroke="none">
+                <rect x="4" y="4" width="16" height="16" rx="2" />
               </svg>
-            </div>
+            </button>
             <p className="text-[var(--text-ui)] text-[var(--danger)] font-bold m-0 animate-pulse" style={{ fontFamily: 'var(--font-ui)' }}>
               Listening... tap to stop
             </p>
