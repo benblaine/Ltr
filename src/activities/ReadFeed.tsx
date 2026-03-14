@@ -89,27 +89,36 @@ export function ReadFeed() {
         const [_recording, asrResult] = await Promise.all([recordingPromise, asrPromise]);
 
         if (asrResult) {
+          // Always show what we heard
           setTranscript(asrResult.transcript ?? '');
-          setIsCorrect(asrResult.isCorrect);
-          setPhase('result');
 
-          // Record to session
-          if (session) {
-            const duration = Date.now() - startTimeRef.current;
-            const updated = await recordAttempt(
-              session,
-              currentWord.id,
-              asrResult.isCorrect ? 'correct' : 'incorrect',
-              asrResult.confidence,
-              duration,
-            );
-            setSession(updated);
+          if (asrResult.mode === 'asr') {
+            // High confidence — auto-judge
+            setIsCorrect(asrResult.isCorrect);
+            setPhase('result');
+
+            if (session) {
+              const duration = Date.now() - startTimeRef.current;
+              const updated = await recordAttempt(
+                session,
+                currentWord.id,
+                asrResult.isCorrect ? 'correct' : 'incorrect',
+                asrResult.confidence,
+                duration,
+              );
+              setSession(updated);
+            }
+          } else {
+            // Low confidence — show transcript but ask user to confirm
+            setPhase('self-eval');
           }
         } else {
-          // No ASR — self eval
+          // No ASR at all — plain self eval
+          setTranscript('');
           setPhase('self-eval');
         }
       } catch {
+        setTranscript('');
         setPhase('self-eval');
       }
     } else if (phase === 'recording') {
@@ -120,7 +129,6 @@ export function ReadFeed() {
 
   const handleSelfEval = useCallback(async (correct: boolean) => {
     setIsCorrect(correct);
-    setTranscript(correct ? words[currentIndex]?.text ?? '' : '...');
     setPhase('result');
 
     if (session && words[currentIndex]) {
@@ -323,21 +331,37 @@ export function ReadFeed() {
 
         {phase === 'self-eval' && (
           <div className="flex flex-col items-center gap-4 mt-4">
+            {transcript ? (
+              <div className="flex flex-col items-center gap-2">
+                <p className="text-[var(--text-ui-small)] text-[var(--text-secondary)] m-0" style={{ fontFamily: 'var(--font-ui)' }}>
+                  We heard you say:
+                </p>
+                <p className="text-[var(--text-ui-large)] font-bold text-[var(--text-primary)] m-0 px-5 py-2 rounded-[var(--radius-md)] bg-[var(--bg-surface)] shadow-[var(--shadow-sm)]" style={{ fontFamily: 'var(--font-learning)' }}>
+                  "{transcript}"
+                </p>
+              </div>
+            ) : (
+              <p className="text-[var(--text-ui)] text-[var(--text-secondary)] m-0" style={{ fontFamily: 'var(--font-ui)' }}>
+                We couldn't quite hear that.
+              </p>
+            )}
             <p className="text-[var(--text-ui)] text-[var(--text-secondary)] m-0" style={{ fontFamily: 'var(--font-ui)' }}>
-              Did you say it right?
+              Did you say it correctly?
             </p>
             <div className="flex gap-6">
               <button
                 onClick={(e) => { e.stopPropagation(); handleSelfEval(true); }}
-                className="px-8 py-4 rounded-[var(--radius-lg)] bg-[var(--accent-correct)] text-white text-2xl font-bold border-none cursor-pointer transition-transform active:scale-95"
+                className="flex flex-col items-center gap-1 px-8 py-4 rounded-[var(--radius-lg)] bg-[var(--accent-correct)] text-white font-bold border-none cursor-pointer transition-transform active:scale-95"
               >
-                👍
+                <span className="text-2xl">👍</span>
+                <span className="text-[var(--text-ui-small)]">Yes!</span>
               </button>
               <button
                 onClick={(e) => { e.stopPropagation(); handleSelfEval(false); }}
-                className="px-8 py-4 rounded-[var(--radius-lg)] bg-[var(--accent-encourage)] text-white text-2xl font-bold border-none cursor-pointer transition-transform active:scale-95"
+                className="flex flex-col items-center gap-1 px-8 py-4 rounded-[var(--radius-lg)] bg-[var(--accent-encourage)] text-white font-bold border-none cursor-pointer transition-transform active:scale-95"
               >
-                👎
+                <span className="text-2xl">👎</span>
+                <span className="text-[var(--text-ui-small)]">Nope</span>
               </button>
             </div>
           </div>

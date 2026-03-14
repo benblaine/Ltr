@@ -87,16 +87,12 @@ export class SpeechEvaluator {
             break;
           }
         }
-        if (confidence >= this.confidenceThreshold) {
-          resolve({
-            mode: 'asr',
-            isCorrect: matched,
-            confidence,
-            transcript: bestTranscript,
-          });
-        } else {
-          resolve(null);
-        }
+        resolve({
+          mode: confidence >= this.confidenceThreshold ? 'asr' : 'self-eval',
+          isCorrect: matched,
+          confidence,
+          transcript: bestTranscript,
+        });
       };
 
       this.recognition!.onerror = () => {

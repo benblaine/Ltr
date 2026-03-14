@@ -59,8 +59,8 @@ function WordFlashActivity({ currentWord, onResult, showingFeedback }: ActivityR
       const [_recording, asrResult] = await Promise.all([recordingPromise, asrPromise]);
       const duration = Date.now() - startTime.current;
 
-      if (asrResult) {
-        // ASR gave a confident result
+      if (asrResult && asrResult.mode === 'asr') {
+        // ASR gave a high-confidence result
         setPhase('feedback');
         onResult(
           asrResult.isCorrect ? 'correct' : 'incorrect',
@@ -68,7 +68,7 @@ function WordFlashActivity({ currentWord, onResult, showingFeedback }: ActivityR
           duration,
         );
       } else {
-        // Fall back to self-evaluation
+        // Low confidence or no ASR — fall back to self-evaluation
         setPhase('self-eval');
       }
     } catch {
