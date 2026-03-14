@@ -55,21 +55,28 @@ export interface DiagnosticEntry {
 
 export class SpeechEvaluator {
   private recognition: SpeechRecognitionInstance | null = null;
+  private SRConstructor: (new () => SpeechRecognitionInstance) | null = null;
   private confidenceThreshold = 0.6;
+  private language: string;
   readonly isSupported: boolean;
   private _log: DiagnosticEntry[] = [];
 
   constructor(language: string = 'en-US') {
-    const SR = window.SpeechRecognition ?? window.webkitSpeechRecognition;
-    this.isSupported = !!SR;
-    this.log('init', `supported=${!!SR}, lang=${language}`);
-    if (this.isSupported && SR) {
-      this.recognition = new SR();
-      this.recognition.continuous = false;
-      this.recognition.interimResults = false;
-      this.recognition.lang = language;
-      this.recognition.maxAlternatives = 3;
-    }
+    this.language = language;
+    this.SRConstructor = window.SpeechRecognition ?? window.webkitSpeechRecognition ?? null;
+    this.isSupported = !!this.SRConstructor;
+    this.log('init', `supported=${this.isSupported}, lang=${language}`);
+  }
+
+  /** Create a fresh SpeechRecognition instance (iOS Safari can't reuse them) */
+  private createRecognition(): SpeechRecognitionInstance | null {
+    if (!this.SRConstructor) return null;
+    const rec = new this.SRConstructor();
+    rec.continuous = false;
+    rec.interimResults = false;
+    rec.lang = this.language;
+    rec.maxAlternatives = 3;
+    return rec;
   }
 
   private log(event: string, detail?: string) {
@@ -89,10 +96,18 @@ export class SpeechEvaluator {
   /** Returns null when ASR unavailable/uncertain — caller shows self-eval UI */
   evaluate(targetWord: string): Promise<EvalResult | null> {
     this.log('evaluate', `target="${targetWord}" canASR=${this.canDoASR}`);
-    if (!this.canDoASR || !this.recognition) {
+    if (!this.canDoASR) {
       this.log('evaluate:skip', `supported=${this.isSupported} online=${navigator.onLine}`);
       return Promise.resolve(null);
     }
+
+    // Create a fresh instance each time — iOS Safari can't reuse them
+    const recognition = this.createRecognition();
+    if (!recognition) {
+      this.log('evaluate:skip', 'no constructor');
+      return Promise.resolve(null);
+    }
+    this.recognition = recognition;
 
     return new Promise((resolve) => {
       let resolved = false;
@@ -106,11 +121,11 @@ export class SpeechEvaluator {
 
       const timeout = setTimeout(() => {
         this.log('timeout', '5s elapsed');
-        this.recognition!.abort();
+        recognition.abort();
         done(null, 'timeout');
       }, 5000);
 
-      this.recognition!.onresult = (event: SpeechRecognitionResultEvent) => {
+      recognition.onresult = (event: SpeechRecognitionResultEvent) => {
         const result = event.results[0];
         const confidence = result[0].confidence;
         let matched = false;
@@ -135,19 +150,19 @@ export class SpeechEvaluator {
         }, 'result');
       };
 
-      this.recognition!.onerror = (event: SpeechRecognitionErrorEvent) => {
+      recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
         this.log('onerror', event.error);
         done(null, 'error');
       };
 
       // Safety net: onend fires after stop()/abort() even if no result/error
-      this.recognition!.onend = () => {
+      recognition.onend = () => {
         this.log('onend', resolved ? 'already-resolved' : 'unresolved');
         done(null, 'end');
       };
 
       try {
-        this.recognition!.start();
+        recognition.start();
         this.log('started');
       } catch (e) {
         this.log('start:error', String(e));
