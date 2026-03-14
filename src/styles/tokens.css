@@ -1,0 +1,36 @@
+:root {
+  --bg-primary: #FFF8F0;
+  --bg-secondary: #F0E6D6;
+  --bg-surface: #FFFFFF;
+  --text-primary: #2D2A26;
+  --text-secondary: #6B5E50;
+  --accent-correct: #4CAF50;
+  --accent-encourage: #FF9800;
+  --accent-highlight: #42A5F5;
+  --accent-celebrate: #FFD700;
+  --interactive: #7C4DFF;
+  --interactive-hover: #651FFF;
+  --danger: #E53935;
+  --font-learning: 'Andika', sans-serif;
+  --font-ui: 'Nunito', sans-serif;
+  --text-learning: clamp(32px, 6vw, 56px);
+  --text-ui-large: clamp(20px, 3vw, 28px);
+  --text-ui: clamp(16px, 2.5vw, 20px);
+  --text-ui-small: clamp(14px, 2vw, 16px);
+  --tap-target-min: 48px;
+  --tap-target-child: 64px;
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
+  --radius-full: 9999px;
+  --shadow-sm: 0 1px 3px rgba(45,42,38,0.08);
+  --shadow-md: 0 4px 12px rgba(45,42,38,0.12);
+  --shadow-lg: 0 8px 24px rgba(45,42,38,0.16);
+}
+* { touch-action: manipulation; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
