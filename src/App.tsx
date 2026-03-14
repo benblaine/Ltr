@@ -8,6 +8,7 @@ import { PackEditor } from './editor/PackEditor.js';
 import { SoundTap } from './activities/SoundTap.js';
 import { WordFlash } from './activities/WordFlash.js';
 import { BlendBuilder } from './activities/BlendBuilder.js';
+import { ReadFeed } from './activities/ReadFeed.js';
 
 export function App() {
   return (
@@ -22,6 +23,7 @@ export function App() {
           <Route path="/activity/sound-tap" element={<SoundTap />} />
           <Route path="/activity/word-flash" element={<WordFlash />} />
           <Route path="/activity/blend-builder" element={<BlendBuilder />} />
+          <Route path="/activity/read-feed" element={<ReadFeed />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>

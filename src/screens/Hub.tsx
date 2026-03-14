@@ -32,10 +32,9 @@ export function Hub() {
     return null;
   }
 
-  const activities = [
-    { type: 'sound-tap' as const, name: 'Sound Tap', emoji: '👂', description: 'Tap the right letter sound', color: 'var(--accent-highlight)' },
-    { type: 'word-flash' as const, name: 'Word Flash', emoji: '📖', description: 'Read the word aloud', color: 'var(--interactive)' },
-    { type: 'blend-builder' as const, name: 'Blend Builder', emoji: '🧩', description: 'Build words from letters', color: 'var(--accent-correct)' },
+  const otherActivities = [
+    { type: 'sound-tap' as const, name: 'Sound Tap', emoji: '👂', description: 'Tap the right letter sound' },
+    { type: 'blend-builder' as const, name: 'Blend Builder', emoji: '🧩', description: 'Build words from letters' },
   ];
 
   return (
@@ -57,23 +56,34 @@ export function Hub() {
         </p>
       )}
 
-      <div className="grid gap-4 w-full">
-        {activities.map((act) => (
+      {/* Primary CTA — Read Feed */}
+      <button
+        onClick={() => navigate('/activity/read-feed')}
+        className="w-full flex flex-col items-center gap-3 p-6 rounded-[var(--radius-lg)] bg-[var(--interactive)] text-white shadow-[var(--shadow-lg)] border-none cursor-pointer transition-transform active:scale-95"
+        style={{ minHeight: '120px' }}
+      >
+        <span className="text-5xl">📖</span>
+        <span className="text-[var(--text-ui-large)] font-bold" style={{ fontFamily: 'var(--font-ui)' }}>
+          Start Reading
+        </span>
+        <span className="text-[var(--text-ui-small)] opacity-80" style={{ fontFamily: 'var(--font-ui)' }}>
+          See a word, say it, swipe for more
+        </span>
+      </button>
+
+      {/* Other activities */}
+      <div className="grid grid-cols-2 gap-3 w-full">
+        {otherActivities.map((act) => (
           <button
             key={act.type}
             onClick={() => navigate(`/activity/${act.type}`)}
-            className="flex items-center gap-4 p-4 rounded-[var(--radius-lg)] bg-[var(--bg-surface)] shadow-[var(--shadow-md)] border-none cursor-pointer text-left transition-transform active:scale-95"
+            className="flex flex-col items-center gap-2 p-4 rounded-[var(--radius-lg)] bg-[var(--bg-surface)] shadow-[var(--shadow-md)] border-none cursor-pointer text-center transition-transform active:scale-95"
             style={{ minHeight: 'var(--tap-target-child)' }}
           >
-            <span className="text-3xl">{act.emoji}</span>
-            <div>
-              <h2 className="text-[var(--text-ui)] font-bold m-0" style={{ fontFamily: 'var(--font-ui)' }}>
-                {act.name}
-              </h2>
-              <p className="text-[var(--text-secondary)] text-[var(--text-ui-small)] m-0">
-                {act.description}
-              </p>
-            </div>
+            <span className="text-2xl">{act.emoji}</span>
+            <span className="text-[var(--text-ui-small)] font-bold" style={{ fontFamily: 'var(--font-ui)' }}>
+              {act.name}
+            </span>
           </button>
         ))}
       </div>
