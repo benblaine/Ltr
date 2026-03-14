@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useProfile } from '../contexts/ProfileContext.js';
 import { selectSessionWords } from '../engine/selector.js';
 import { startSession, recordAttempt, endSession, computeStars, type SessionState } from '../engine/session.js';
-import { AudioRecorder } from '../audio/recorder.js';
 import { SpeechEvaluator } from '../audio/evaluator.js';
 import { speak } from '../audio/speaker.js';
 import { Celebration } from '../components/Celebration.js';
@@ -28,7 +27,6 @@ export function ReadFeed() {
 
   const [showDiagnostics, setShowDiagnostics] = useState(false);
 
-  const recorderRef = useRef<AudioRecorder | null>(null);
   const evaluatorRef = useRef<SpeechEvaluator | null>(null);
   const startTimeRef = useRef(Date.now());
   const touchStartRef = useRef<{ y: number; time: number } | null>(null);
@@ -47,12 +45,10 @@ export function ReadFeed() {
     init();
   }, [activePack, profile]);
 
-  // Init audio
+  // Init speech evaluator
   useEffect(() => {
-    recorderRef.current = new AudioRecorder();
     evaluatorRef.current = new SpeechEvaluator();
     return () => {
-      recorderRef.current?.cleanup();
       evaluatorRef.current?.abort();
     };
   }, []);
@@ -75,20 +71,16 @@ export function ReadFeed() {
 
   const handleStartRecording = useCallback(async () => {
     if (phase !== 'ready') return;
-    const recorder = recorderRef.current;
     const evaluator = evaluatorRef.current;
-    if (!recorder) return;
+    if (!evaluator) return;
 
     setPhase('recording');
 
     try {
       const currentWord = words[currentIndex];
-      const recordingPromise = recorder.start();
-      const asrPromise = evaluator?.canDoASR
-        ? evaluator.evaluate(currentWord.text)
-        : Promise.resolve(null);
-
-      const [_recording, asrResult] = await Promise.all([recordingPromise, asrPromise]);
+      const asrResult = evaluator.canDoASR
+        ? await evaluator.evaluate(currentWord.text)
+        : null;
 
       if (asrResult) {
         setTranscript(asrResult.transcript ?? '');
@@ -123,7 +115,6 @@ export function ReadFeed() {
 
   const handleStopRecording = useCallback(() => {
     if (phase !== 'recording') return;
-    recorderRef.current?.stop();
     evaluatorRef.current?.stop();
   }, [phase]);
 
@@ -164,10 +155,11 @@ export function ReadFeed() {
     }, 200);
   }, [phase, session, currentIndex, words.length]);
 
-  // Swipe up detection
+  // Swipe up detection — only active during result phase
   const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    if (phase !== 'result') return;
     touchStartRef.current = { y: e.touches[0].clientY, time: Date.now() };
-  }, []);
+  }, [phase]);
 
   const handleTouchEnd = useCallback((e: React.TouchEvent) => {
     if (!touchStartRef.current) return;
@@ -261,7 +253,6 @@ export function ReadFeed() {
 
       {showDiagnostics && (
         <DiagnosticPanel
-          recorder={recorderRef.current}
           evaluator={evaluatorRef.current}
           phase={phase}
           onClose={() => setShowDiagnostics(false)}

@@ -1,15 +1,13 @@
 import { useState, useCallback } from 'react';
-import type { AudioRecorder } from '../audio/recorder.js';
 import type { SpeechEvaluator } from '../audio/evaluator.js';
 
 interface Props {
-  recorder: AudioRecorder | null;
   evaluator: SpeechEvaluator | null;
   phase: string;
   onClose: () => void;
 }
 
-export function DiagnosticPanel({ recorder, evaluator, phase, onClose }: Props) {
+export function DiagnosticPanel({ evaluator, phase, onClose }: Props) {
   const [copied, setCopied] = useState(false);
 
   const buildReport = useCallback(() => {
@@ -34,19 +32,8 @@ export function DiagnosticPanel({ recorder, evaluator, phase, onClose }: Props) 
       lines.push('(no evaluator)');
     }
 
-    lines.push('');
-    lines.push('--- Recorder Log ---');
-    if (recorder) {
-      for (const entry of recorder.diagnosticLog) {
-        const t = new Date(entry.timestamp).toISOString().slice(11, 23);
-        lines.push(`[${t}] ${entry.event}${entry.detail ? ': ' + entry.detail : ''}`);
-      }
-    } else {
-      lines.push('(no recorder)');
-    }
-
     return lines.join('\n');
-  }, [recorder, evaluator, phase]);
+  }, [evaluator, phase]);
 
   const handleCopy = useCallback(async () => {
     const report = buildReport();
