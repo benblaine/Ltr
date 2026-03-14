@@ -50,7 +50,7 @@ export function ReadFeed() {
     evaluatorRef.current = new SpeechEvaluator();
     return () => {
       recorderRef.current?.cleanup();
-      evaluatorRef.current?.stop();
+      evaluatorRef.current?.abort();
     };
   }, []);
 
@@ -122,8 +122,9 @@ export function ReadFeed() {
         setPhase('self-eval');
       }
     } else if (phase === 'recording') {
-      // Stop recording early
+      // Stop recording and ASR so promises resolve immediately
       recorderRef.current?.stop();
+      evaluatorRef.current?.stop();
     }
   }, [phase, words, currentIndex, session]);
 

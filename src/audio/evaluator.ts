@@ -108,7 +108,9 @@ export class SpeechEvaluator {
     const a = clean(spoken);
     const b = clean(target);
     if (a === b) return true;
-    const maxDist = b.length <= 4 ? 1 : 2;
+    // Strict for short words — "sat" vs "set" is a real mistake
+    if (b.length <= 3) return false;
+    const maxDist = b.length <= 5 ? 1 : 2;
     return this.levenshtein(a, b) <= maxDist;
   }
 
@@ -126,7 +128,17 @@ export class SpeechEvaluator {
     return m[a.length][b.length];
   }
 
+  /** Stop recognition gracefully — triggers onresult with whatever was captured */
   stop() {
+    try {
+      this.recognition?.stop();
+    } catch {
+      // ignore — may not be running
+    }
+  }
+
+  /** Abort recognition immediately — discards any pending result */
+  abort() {
     try {
       this.recognition?.abort();
     } catch {
