@@ -61,7 +61,6 @@ export class SpeechEvaluator {
   readonly isSupported: boolean;
   private _log: DiagnosticEntry[] = [];
   private micStream: MediaStream | null = null;
-  private micUnlocked = false;
 
   constructor(language: string = 'en-US') {
     this.language = language;
@@ -72,17 +71,25 @@ export class SpeechEvaluator {
 
   /**
    * iOS Safari requires getUserMedia() to "unlock" the mic before
-   * SpeechRecognition can access it. Call once per session.
+   * SpeechRecognition can access it. Must release and re-acquire
+   * each time — holding the stream blocks subsequent recognitions.
    */
-  private async ensureMicAccess(): Promise<void> {
-    if (this.micUnlocked) return;
+  private async acquireMic(): Promise<void> {
+    // Release any previous stream first
+    this.releaseMic();
     try {
       this.log('mic:request', 'getUserMedia');
       this.micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      this.micUnlocked = true;
       this.log('mic:granted', `tracks=${this.micStream.getTracks().length}`);
     } catch (e) {
       this.log('mic:denied', String(e));
+    }
+  }
+
+  private releaseMic() {
+    if (this.micStream) {
+      this.micStream.getTracks().forEach(t => t.stop());
+      this.micStream = null;
     }
   }
 
@@ -119,8 +126,8 @@ export class SpeechEvaluator {
       return null;
     }
 
-    // iOS Safari: getUserMedia() must be called to unlock mic before SpeechRecognition works
-    await this.ensureMicAccess();
+    // iOS Safari: fresh getUserMedia() each time — holding a stale stream blocks recognition
+    await this.acquireMic();
 
     // Create a fresh instance each time — iOS Safari can't reuse them
     const recognition = this.createRecognition();
@@ -136,6 +143,7 @@ export class SpeechEvaluator {
         if (resolved) return;
         resolved = true;
         clearTimeout(timeout);
+        this.releaseMic();
         this.log(`resolve:${reason}`, result ? `transcript="${result.transcript}" correct=${result.isCorrect} conf=${result.confidence.toFixed(2)}` : 'null');
         resolve(result);
       };
@@ -238,10 +246,6 @@ export class SpeechEvaluator {
   /** Release mic stream and clean up */
   cleanup() {
     this.abort();
-    if (this.micStream) {
-      this.micStream.getTracks().forEach(t => t.stop());
-      this.micStream = null;
-      this.micUnlocked = false;
-    }
+    this.releaseMic();
   }
 }
