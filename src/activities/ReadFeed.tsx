@@ -7,6 +7,7 @@ import { AudioRecorder } from '../audio/recorder.js';
 import { SpeechEvaluator } from '../audio/evaluator.js';
 import { speak } from '../audio/speaker.js';
 import { Celebration } from '../components/Celebration.js';
+import { DiagnosticPanel } from '../components/DiagnosticPanel.js';
 import type { Word } from '../types/content.js';
 
 type CardPhase = 'ready' | 'recording' | 'result' | 'self-eval';
@@ -24,6 +25,8 @@ export function ReadFeed() {
   const [showCelebration, setShowCelebration] = useState(false);
   const [loading, setLoading] = useState(true);
   const [slideDirection, setSlideDirection] = useState<'in' | 'out' | null>(null);
+
+  const [showDiagnostics, setShowDiagnostics] = useState(false);
 
   const recorderRef = useRef<AudioRecorder | null>(null);
   const evaluatorRef = useRef<SpeechEvaluator | null>(null);
@@ -250,8 +253,24 @@ export function ReadFeed() {
         <span className="text-[var(--text-ui-small)] text-[var(--text-secondary)] font-semibold" style={{ fontFamily: 'var(--font-ui)' }}>
           {progress}
         </span>
-        <div className="w-10" /> {/* spacer */}
+        <button
+          onClick={() => setShowDiagnostics(d => !d)}
+          className="w-10 h-10 flex items-center justify-center rounded-full bg-[var(--bg-secondary)] border-none cursor-pointer text-[var(--text-secondary)] text-xs"
+          style={{ fontFamily: 'var(--font-ui)' }}
+          aria-label="Diagnostics"
+        >
+          diag
+        </button>
       </div>
+
+      {showDiagnostics && (
+        <DiagnosticPanel
+          recorder={recorderRef.current}
+          evaluator={evaluatorRef.current}
+          phase={phase}
+          onClose={() => setShowDiagnostics(false)}
+        />
+      )}
 
       {/* Progress dots */}
       <div className="flex justify-center gap-1.5 px-6">

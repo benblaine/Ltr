@@ -3,6 +3,12 @@ export interface RecordingResult {
   durationMs: number;
 }
 
+export interface RecorderDiagnosticEntry {
+  timestamp: number;
+  event: string;
+  detail?: string;
+}
+
 export class AudioRecorder {
   private mediaRecorder: MediaRecorder | null = null;
   private audioContext: AudioContext | null = null;
@@ -13,8 +19,20 @@ export class AudioRecorder {
   private silenceMs = 800;
   private maxDurationMs = 5000;
 
+  private _log: RecorderDiagnosticEntry[] = [];
+
+  private log(event: string, detail?: string) {
+    this._log.push({ timestamp: Date.now(), event, detail });
+    if (this._log.length > 50) this._log.shift();
+  }
+
+  get diagnosticLog(): RecorderDiagnosticEntry[] {
+    return [...this._log];
+  }
+
   async requestPermission(): Promise<boolean> {
     try {
+      this.log('requestPermission', 'requesting');
       this.stream = await navigator.mediaDevices.getUserMedia({
         audio: {
           echoCancellation: true,
@@ -22,8 +40,10 @@ export class AudioRecorder {
           sampleRate: 16000,
         },
       });
+      this.log('requestPermission', `granted, tracks=${this.stream.getTracks().length}`);
       return true;
-    } catch {
+    } catch (e) {
+      this.log('requestPermission', `denied: ${e}`);
       return false;
     }
   }
@@ -33,6 +53,8 @@ export class AudioRecorder {
       const granted = await this.requestPermission();
       if (!granted) throw new Error('Microphone permission denied');
     }
+
+    this.log('start', `stream active=${this.stream!.active}`);
 
     return new Promise((resolve, reject) => {
       const chunks: Blob[] = [];
