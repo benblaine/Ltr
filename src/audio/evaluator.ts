@@ -60,12 +60,30 @@ export class SpeechEvaluator {
   private language: string;
   readonly isSupported: boolean;
   private _log: DiagnosticEntry[] = [];
+  private micStream: MediaStream | null = null;
+  private micUnlocked = false;
 
   constructor(language: string = 'en-US') {
     this.language = language;
     this.SRConstructor = window.SpeechRecognition ?? window.webkitSpeechRecognition ?? null;
     this.isSupported = !!this.SRConstructor;
     this.log('init', `supported=${this.isSupported}, lang=${language}`);
+  }
+
+  /**
+   * iOS Safari requires getUserMedia() to "unlock" the mic before
+   * SpeechRecognition can access it. Call once per session.
+   */
+  private async ensureMicAccess(): Promise<void> {
+    if (this.micUnlocked) return;
+    try {
+      this.log('mic:request', 'getUserMedia');
+      this.micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      this.micUnlocked = true;
+      this.log('mic:granted', `tracks=${this.micStream.getTracks().length}`);
+    } catch (e) {
+      this.log('mic:denied', String(e));
+    }
   }
 
   /** Create a fresh SpeechRecognition instance (iOS Safari can't reuse them) */
@@ -94,18 +112,21 @@ export class SpeechEvaluator {
   }
 
   /** Returns null when ASR unavailable/uncertain — caller shows self-eval UI */
-  evaluate(targetWord: string): Promise<EvalResult | null> {
+  async evaluate(targetWord: string): Promise<EvalResult | null> {
     this.log('evaluate', `target="${targetWord}" canASR=${this.canDoASR}`);
     if (!this.canDoASR) {
       this.log('evaluate:skip', `supported=${this.isSupported} online=${navigator.onLine}`);
-      return Promise.resolve(null);
+      return null;
     }
+
+    // iOS Safari: getUserMedia() must be called to unlock mic before SpeechRecognition works
+    await this.ensureMicAccess();
 
     // Create a fresh instance each time — iOS Safari can't reuse them
     const recognition = this.createRecognition();
     if (!recognition) {
       this.log('evaluate:skip', 'no constructor');
-      return Promise.resolve(null);
+      return null;
     }
     this.recognition = recognition;
 
@@ -211,6 +232,16 @@ export class SpeechEvaluator {
       this.recognition?.abort();
     } catch {
       // ignore
+    }
+  }
+
+  /** Release mic stream and clean up */
+  cleanup() {
+    this.abort();
+    if (this.micStream) {
+      this.micStream.getTracks().forEach(t => t.stop());
+      this.micStream = null;
+      this.micUnlocked = false;
     }
   }
 }

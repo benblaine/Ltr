@@ -49,7 +49,7 @@ export function ReadFeed() {
   useEffect(() => {
     evaluatorRef.current = new SpeechEvaluator();
     return () => {
-      evaluatorRef.current?.abort();
+      evaluatorRef.current?.cleanup();
     };
   }, []);
 
